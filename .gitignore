@@ -1,0 +1,24 @@
+# Dependencies and build artifacts
+node_modules/
+dist/
+build/
+coverage/
+
+# Environment and local config
+.env
+.env.*.local
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Supabase local state (if using Supabase CLI)
+.supabase/
+
+# Temp and logs
+temp_*.txt
+tmp_*.txt
+*.log
+temp_view.txt

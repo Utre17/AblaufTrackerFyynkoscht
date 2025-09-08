@@ -1,0 +1,212 @@
+﻿<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fyynkoscht Ablauf-Tracker</title>
+    <meta name="theme-color" content="#32373c" />
+    <style>
+      :root { --brand:#32373c; --brand-700:#25292d; --bg:#f7f7f7; --fg:#0b1221; --muted:#6b7280; --red:#cf2e2e; --green:#16a34a; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--fg); }
+      header { position: sticky; top: 0; background: white; border-bottom: 1px solid #e5e7eb; z-index: 10; }
+      .container { max-width: 980px; margin: 0 auto; padding: 16px; }
+      h1 { font-size: 26px; margin: 8px 0 12px; color: var(--brand); }
+      nav { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 8px; }
+      nav button { font-size: 16px; padding: 10px 14px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; }
+      nav button.active { background: var(--brand); color: #fff; border-color: var(--brand-700); }
+      .view { display: none; padding-top: 8px; }
+      .view.active { display: block; }
+      label { display: block; margin: 10px 0 4px; font-weight: 600; }
+      input, select { width: 100%; padding: 10px 12px; font-size: 16px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+      .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding: 10px 14px; font-size: 16px; border-radius: 10px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; }
+      .btn.primary { background: var(--brand); color:#fff; border-color: var(--brand-700); }
+      .btn.danger { background: var(--red); color:#fff; border-color: #b91c1c; }
+      .chips { display:flex; gap:8px; flex-wrap: wrap; margin-top: 6px; }
+      .chip { padding: 8px 10px; border-radius: 999px; border:1px solid #d1d5db; background:#fff; font-size:14px; cursor:pointer; }
+      .list { margin-top: 4px; }
+      .item { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding: 12px; margin: 8px 0; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+      .small { color: var(--muted); font-size: 14px; }
+      .badge { display:inline-block; padding:2px 8px; font-size: 12px; border-radius: 999px; border:1px solid #d1d5db; }
+      .badge.red { background:#fee2e2; color:#991b1b; border-color:#fecaca; }
+      .badge.orange { background:#ffedd5; color:#9a3412; border-color:#fed7aa; }
+      .badge.green { background:#dcfce7; color:#065f46; border-color:#bbf7d0; }
+      .table { width: 100%; border-collapse: collapse; background:#fff; border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; }
+      .table th, .table td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+      .status-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right: 6px; vertical-align: middle; }
+      .note { background:#fff; border:1px dashed #d1d5db; border-radius: 10px; padding: 10px 12px; color: var(--muted); }
+      .auth { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+      .auth input { width:auto; }
+      .right { margin-left: auto; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="container">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap: wrap;">
+          <img src="assets/logo.png" alt="Basler Fyynkoscht" style="height:42px; width:auto;" />
+          <h1>Ablauf-Tracker</h1>
+          <span class="right small" id="authEmail" style="display:none;"></span>
+          <div class="right" style="display:flex; gap:8px;">
+            <button class="btn" id="btnNavLogin">Anmelden</button>
+            <button class="btn" id="btnNavLogout" style="display:none;">Abmelden</button>
+          </div>
+        </div>
+        <nav>
+          <button data-view="new" class="active">Neue Lieferung</button>
+          <button data-view="soon">Bald ablaufend</button>
+          <button data-view="all">Alle (Aktiv)</button>
+          <button data-view="min">Mindestbestand</button>
+        </nav>
+      </div>
+    </header>
+    <main class="container">
+      <section id="view-auth" class="view">
+        <label>E-Mail</label>
+        <input id="loginEmail" type="email" placeholder="E-Mail" />
+        <label>Passwort</label>
+        <input id="loginPassword" type="password" placeholder="Passwort" />
+        <div class="actions">
+          <button class="btn primary" id="btnLogin">Anmelden</button>
+        </div>
+        <div class="small" style="margin-top:8px; color:var(--muted);">Nur angemeldete Benutzer dürfen Einträge anlegen/ändern.</div>
+      </section>
+
+      <section id="view-new" class="view active">
+        <div class="note small">Hinweis: Ablaufdatum wird immer direkt gespeichert (kein Default). Menge ist optional und rein informativ.</div>
+        <label>Produkt</label>
+        <div class="row">
+          <select id="productSelect"></select>
+          <div style="display:flex; gap:8px;">
+            <input id="newProductName" type="text" placeholder="Neues Produkt (nur Name)" />
+            <button class="btn" id="btnAddProduct">Produkt anlegen</button>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Eingangsdatum</label>
+            <input id="receivedOn" type="date" />
+          </div>
+          <div>
+            <label>Ablaufdatum</label>
+            <input id="expiry" type="date" required />
+            <div class="chips">
+              <span class="chip" data-add-days="7">+7 Tage</span>
+              <span class="chip" data-add-days="14">+14 Tage</span>
+              <span class="chip" data-add-days="30">+30 Tage</span>
+              <span class="chip" data-add-days="60">+60 Tage</span>
+              <span class="chip" data-add-days="90">+90 Tage</span>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Menge (optional)</label>
+            <input id="qty" type="number" min="0" step="1" placeholder="z.B. 12" />
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="btnSave">Speichern</button>
+        </div>
+        <div id="saveMsg" class="small" style="margin-top:8px;"></div>
+      </section>
+
+      <section id="view-soon" class="view">
+        <div class="list" id="listSoon"></div>
+      </section>
+
+      <section id="view-all" class="view">
+        <div class="list" id="listAll"></div>
+      </section>
+
+      <section id="view-min" class="view">
+        <div class="note" style="margin-bottom:12px;">
+          <div style="font-weight:600; margin-bottom:6px;">Produkte verwalten</div>
+          <div class="row">
+            <div>
+              <label>CSV-Datei mit Produkten</label>
+              <input id="productCSV" type="file" accept=".csv,text/csv" />
+              <div class="small">Erwartete Spalten: name[, min_required, active, below_manual]</div>
+            </div>
+            <div>
+              <label>&nbsp;</label>
+              <div class="actions">
+                <button class="btn" id="btnImportCSV">CSV importieren (Produkte)</button>
+                <button class="btn" id="btnExportCSV">CSV exportieren (Produkte)</button>
+              </div>
+              <div id="importMsg" class="small" style="margin-top:6px;"></div>
+            </div>
+          </div>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Produkt</th>
+              <th style="width:160px;">Mindestbestand</th>
+              <th style="width:220px;">Unter Mindestbestand?</th>
+              <th style="width:120px;">Aktiv?</th>
+            </tr>
+          </thead>
+          <tbody id="minTable"></tbody>
+        </table>
+        <div class="small" style="margin-top:8px;">Diese Liste ist rein manuell und nicht mit Lieferungen verknÃ¼pft.</div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      // Minimal polyfills for older Safari on iPad
+      (function(){
+        if (!NodeList.prototype.forEach) {
+          NodeList.prototype.forEach = Array.prototype.forEach;
+        }
+        if (!Array.prototype.find) {
+          Object.defineProperty(Array.prototype, 'find', { value: function(predicate) {
+            if (this == null) throw new TypeError('Array.prototype.find called on null or undefined');
+            if (typeof predicate !== 'function') throw new TypeError('predicate must be a function');
+            var list = Object(this); var length = list.length >>> 0; var thisArg = arguments[1];
+            for (var i = 0; i < length; i++) { var value = list[i]; if (predicate.call(thisArg, value, i, list)) return value; }
+            return undefined;
+          }, configurable: true, writable: true });
+        }
+        if (!Array.prototype.includes) {
+          Object.defineProperty(Array.prototype, 'includes', { value: function(searchElement, fromIndex) {
+            if (this == null) throw new TypeError('Array.prototype.includes called on null or undefined');
+            var o = Object(this); var len = o.length >>> 0; if (len === 0) return false;
+            var n = fromIndex | 0; var k = Math.max(n >= 0 ? n : len - Math.abs(n), 0);
+            while (k < len) { if (o[k] === searchElement || (typeof o[k] === 'number' && typeof searchElement === 'number' && isNaN(o[k]) && isNaN(searchElement))) return true; k++; }
+            return false;
+          }, configurable: true, writable: true });
+        }
+        if (!String.prototype.includes) {
+          Object.defineProperty(String.prototype, 'includes', { value: function(search, start) {
+            if (search instanceof RegExp) throw TypeError('first argument must not be a RegExp');
+            if (start === undefined) start = 0;
+            return this.indexOf(search, start) !== -1;
+          }, configurable: true, writable: true });
+        }
+        if (typeof Object.assign != 'function') {
+          Object.defineProperty(Object, 'assign', { value: function(target) {
+            if (target == null) throw new TypeError('Cannot convert undefined or null to object');
+            var to = Object(target);
+            for (var index = 1; index < arguments.length; index++) {
+              var nextSource = arguments[index];
+              if (nextSource != null) {
+                for (var nextKey in nextSource) {
+                  if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
+                    to[nextKey] = nextSource[nextKey];
+                  }
+                }
+              }
+            }
+            return to;
+          }, configurable: true, writable: true });
+        }
+      })();
+    </script>
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+  </html>
