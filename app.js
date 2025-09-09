@@ -18,6 +18,7 @@
 
   const el = {
     productSelect: document.getElementById('productSelect'),
+    productSearch: document.getElementById('productSearch'),
     newProductName: document.getElementById('newProductName'),
     btnAddProduct: document.getElementById('btnAddProduct'),
     receivedOn: document.getElementById('receivedOn'),
@@ -25,6 +26,7 @@
     qty: document.getElementById('qty'),
     btnSave: document.getElementById('btnSave'),
     saveMsg: document.getElementById('saveMsg'),
+    toast: document.getElementById('toast'),
     listSoon: document.getElementById('listSoon'),
     listAll: document.getElementById('listAll'),
     minTable: document.getElementById('minTable'),
@@ -43,6 +45,31 @@
   };
 
   // Helpers
+  let _toastTimer = null;
+  function showToast(message, durationMs) {
+    try {
+      const ms = typeof durationMs === 'number' ? durationMs : 1600;
+      if (!el.toast) return;
+      el.toast.textContent = String(message || '');
+      el.toast.classList.add('show');
+      if (_toastTimer) clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(() => { el.toast.classList.remove('show'); }, ms);
+    } catch (_) {}
+  }
+
+  function filterProductOptions(query) {
+    const q = normalizeName(query || '');
+    const opts = el.productSelect ? el.productSelect.querySelectorAll('option') : [];
+    if (!opts || opts.length === 0) return;
+    opts.forEach((opt, idx) => {
+      if (idx === 0) { opt.hidden = false; opt.style.display = ''; return; }
+      const label = normalizeName(opt.textContent || '');
+      const show = !q || label.includes(q);
+      opt.hidden = !show;
+      opt.style.display = show ? '' : 'none';
+    });
+  }
+
   const toLocalDateStr = (d) => {
     var y = d.getFullYear();
     var m = d.getMonth() + 1;
@@ -539,6 +566,9 @@
       if (key && !seen.has(key)) { seen.add(key); unique.push(p); }
     });
     renderProductOptionsCompat(unique);
+    if (el.productSearch && el.productSearch.value) {
+      filterProductOptions(el.productSearch.value);
+    }
     return products;
   }
 
@@ -655,6 +685,15 @@
     el.expiry.value = toLocalDateStr(addDays(base, add));
   }));
 
+  if (el.productSearch) {
+    let _filterTimer = null;
+    el.productSearch.addEventListener('input', () => {
+      if (_filterTimer) clearTimeout(_filterTimer);
+      const val = el.productSearch.value;
+      _filterTimer = setTimeout(() => filterProductOptions(val), 60);
+    });
+  }
+
   el.btnSave.addEventListener('click', async () => {
     const product_id = el.productSelect.value;
     const received_on = el.receivedOn.value;
@@ -665,6 +704,7 @@
     try {
       await saveItem({ product_id, received_on, expiry, qty });
       el.saveMsg.textContent = 'Gespeichert.';
+      showToast('gespeichert');
       el.qty.value = '';
       el.expiry.value = '';
       await renderLists();

@@ -41,4 +41,10 @@ Alternative mit GitHub CLI (falls installiert):
 - Keine Secrets einchecken (`.env` ist in `.gitignore`).
 - `ANON_KEY` ist im Client öffentlich ok, RLS muss korrekt gesetzt sein (siehe SQL in `project.md`).
 - Dateien am besten in UTF‑8 speichern, um Encoding‑Probleme zu vermeiden.
+
+## TODO
+- Email-Benachrichtigung für ablaufende Items noch offen.
+  - Implementieren in `supabase/functions/notify/index.ts` neben der Telegram-Logik (siehe `sendTelegram`-Aufruf in `supabase/functions/notify/index.ts:143`).
+  - Optionen: SMTP (Supabase Auth SMTP), Resend, Mailgun o.ä.; Konfiguration via ENV (`EMAIL_FROM`, `EMAIL_TO`, Provider‑Key).
+  - Gleiche Triggerschwelle wie Telegram (09:00 Europe/Zurich, Stufen 14/7/1) und nur für neue Stufen senden.
 # AblaufTrackerFyynkoscht

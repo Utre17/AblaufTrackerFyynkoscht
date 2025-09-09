@@ -40,6 +40,10 @@
       .auth { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
       .auth input { width:auto; }
       .right { margin-left: auto; }
+      .stack { display:flex; flex-direction: column; gap: 6px; }
+      /* Toast */
+      .toast { position: fixed; left:50%; bottom:16px; transform: translateX(-50%) translateY(20px); background: var(--brand); color:#fff; padding:10px 14px; border-radius:999px; box-shadow: 0 6px 20px rgba(0,0,0,.2); opacity:0; pointer-events:none; transition: opacity .18s ease, transform .18s ease; z-index: 1000; }
+      .toast.show { opacity:1; transform: translateX(-50%) translateY(0); }
     </style>
   </head>
   <body>
@@ -78,7 +82,10 @@
         <div class="note small">Hinweis: Ablaufdatum wird immer direkt gespeichert (kein Default). Menge ist optional und rein informativ.</div>
         <label>Produkt</label>
         <div class="row">
-          <select id="productSelect"></select>
+          <div class="stack">
+            <input id="productSearch" type="text" placeholder="Suchen..." />
+            <select id="productSelect"></select>
+          </div>
           <div style="display:flex; gap:8px;">
             <input id="newProductName" type="text" placeholder="Neues Produkt (nur Name)" />
             <button class="btn" id="btnAddProduct">Produkt anlegen</button>
@@ -206,6 +213,7 @@
         }
       })();
     </script>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="config.js"></script>
     <script src="app.js"></script>
   </body>
