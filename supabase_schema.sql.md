@@ -25,6 +25,8 @@ END $$;
 CREATE TABLE IF NOT EXISTS public.products (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text UNIQUE NOT NULL,
+  -- Optional: store producer/brand as plain text. For richer data, consider a separate producers table.
+  producer text,
   min_required integer NOT NULL DEFAULT 0,
   below_manual boolean NOT NULL DEFAULT false,
   active boolean NOT NULL DEFAULT true,
@@ -127,4 +129,12 @@ Tip: You may also want to normalize existing data by trimming names:
 
 ```sql
 UPDATE public.products SET name = trim(regexp_replace(name, '\\s+', ' ', 'g'));
+```
+
+Migration for existing projects
+
+If your `products` table already exists without the `producer` column, run this one-time migration first:
+
+```sql
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS producer text;
 ```

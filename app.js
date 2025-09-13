@@ -30,6 +30,7 @@
     listSoon: document.getElementById('listSoon'),
     listAll: document.getElementById('listAll'),
     minTable: document.getElementById('minTable'),
+    producerFilter: document.getElementById('producerFilter'),
     chips: document.querySelectorAll('.chip[data-add-days]'),
     authEmail: document.getElementById('authEmail'),
     loginEmail: document.getElementById('loginEmail'),
@@ -42,6 +43,7 @@
     btnImportCSV: document.getElementById('btnImportCSV'),
     btnExportCSV: document.getElementById('btnExportCSV'),
     importMsg: document.getElementById('importMsg'),
+    btnClearSearch: document.getElementById('btnClearSearch'),
   };
 
   // Helpers
@@ -61,13 +63,30 @@
     const q = normalizeName(query || '');
     const opts = el.productSelect ? el.productSelect.querySelectorAll('option') : [];
     if (!opts || opts.length === 0) return;
+    const visible = [];
     opts.forEach((opt, idx) => {
       if (idx === 0) { opt.hidden = false; opt.style.display = ''; return; }
       const label = normalizeName(opt.textContent || '');
-      const show = !q || label.includes(q);
+      let show = !q || label.includes(q);
+      if (!show && q) {
+        // Also match by producer (without changing the option label)
+        const pid = opt.value;
+        const p = (productsCache || []).find(pp => String(pp.id) === String(pid));
+        const prod = p && p.producer ? normalizeName(p.producer) : '';
+        if (prod && prod.includes(q)) show = true;
+      }
       opt.hidden = !show;
       opt.style.display = show ? '' : 'none';
+      if (show) visible.push(opt);
     });
+    // Convenience: auto-select first visible option; if none, prepare new product name field
+    if (visible.length > 0) {
+      el.productSelect.value = visible[0].value;
+      if (el.newProductName) el.newProductName.value = '';
+    } else {
+      el.productSelect.value = '';
+      if (el.newProductName) el.newProductName.value = (query || '').trim();
+    }
   }
 
   const toLocalDateStr = (d) => {
@@ -266,14 +285,21 @@
     await ensureClient();
     // map to expected fields
     const payload = rows
-      .map(r => ({
-        name: (r.name || r.product || '').trim().replace(/\s+/g, ' '),
-        // Default min_required to 0 when missing to satisfy NOT NULL
-        min_required: r.min_required != null && r.min_required !== '' ? Number(r.min_required) : 0,
-        // Default flags to sane values if missing to avoid NULL upserts
-        below_manual: r.below_manual != null && r.below_manual !== '' ? toBool(r.below_manual) : false,
-        active: r.active != null && r.active !== '' ? toBool(r.active) : true,
-      }))
+      .map(r => {
+        const base = {
+          name: (r.name || r.product || '').trim().replace(/\s+/g, ' '),
+          // Default min_required to 0 when missing to satisfy NOT NULL
+          min_required: r.min_required != null && r.min_required !== '' ? Number(r.min_required) : 0,
+          // Default flags to sane values if missing to avoid NULL upserts
+          below_manual: r.below_manual != null && r.below_manual !== '' ? toBool(r.below_manual) : false,
+          active: r.active != null && r.active !== '' ? toBool(r.active) : true,
+        };
+        // Optional producer/brand string (only set if provided in CSV)
+        if (r.producer != null && r.producer !== '') {
+          base.producer = String(r.producer).trim();
+        }
+        return base;
+      })
       .filter(p => p.name);
     if (payload.length === 0) return { inserted: 0 };
     // Supabase upsert on unique name
@@ -507,11 +533,22 @@
   }
 
   function renderMinTable(products) {
-    el.minTable.innerHTML = products.map((p) => {
+    // Apply producer filter if present
+    let list = products || [];
+    if (el.producerFilter && el.producerFilter.value !== undefined) {
+      const f = el.producerFilter.value;
+      if (f) {
+        const fn = normalizeName(f);
+        list = list.filter(p => normalizeName(p.producer || '') === fn);
+      }
+    }
+
+    el.minTable.innerHTML = list.map((p) => {
       const ok = !p.below_manual;
       return `
         <tr>
           <td>${p.name}</td>
+          <td>${p.producer ? p.producer : ''}</td>
           <td>
             <input type="number" min="0" step="1" value="${p.min_required || 0}" data-min="${p.id}" />
           </td>
@@ -555,6 +592,28 @@
     });
   }
 
+  function renderProducerFilter(products) {
+    if (!el.producerFilter) return;
+    const set = new Set();
+    (products || []).forEach((p) => {
+      const v = (p.producer || '').trim();
+      if (v) set.add(v);
+    });
+    // Restore previously selected value from localStorage (if any)
+    const stored = (function(){ try { return localStorage.getItem('producerFilter') || ''; } catch(_) { return ''; }})();
+    const current = stored || el.producerFilter.value || '';
+    const values = Array.from(set).sort((a,b) => a.localeCompare(b, 'de'));
+    el.producerFilter.innerHTML = '<option value="">Alle Produzenten</option>' + values.map(v => `
+      <option value="${String(v).replace(/"/g,'&quot;')}">${v}</option>
+    `).join('');
+    // Restore previous selection if still present
+    if (current && !values.includes(current)) {
+      el.producerFilter.value = '';
+    } else {
+      el.producerFilter.value = current;
+    }
+  }
+
   // Loaders
   async function loadProducts() {
     const products = await fetchProducts();
@@ -574,6 +633,7 @@
 
   async function loadMin() {
     const products = await fetchProducts();
+    renderProducerFilter(products);
     renderMinTable(products);
   }
 
@@ -584,11 +644,23 @@
   // Events
   navButtons.forEach((b) => b.addEventListener('click', () => setActiveView(b.dataset.view)));
 
+  if (el.producerFilter) {
+    el.producerFilter.addEventListener('change', () => {
+      // Persist selection
+      try { localStorage.setItem('producerFilter', el.producerFilter.value || ''); } catch (_) {}
+      // Re-render min table with current productsCache (already fetched)
+      renderMinTable(productsCache);
+    });
+  }
+
   // Import CSV
   if (el.btnImportCSV) {
     el.btnImportCSV.addEventListener('click', async () => {
       try {
         await ensureClient();
+        // Require authenticated session for inserts/updates due to RLS
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { alert('Bitte zuerst anmelden (oben rechts), bevor CSV importiert wird.'); return; }
       } catch (e) {
         alert(e.message);
         return;
@@ -615,9 +687,10 @@
     el.btnExportCSV.addEventListener('click', async () => {
       try {
         const products = await fetchProducts();
-        const header = ['name','min_required','below_manual','active'];
+        const header = ['name','producer','min_required','below_manual','active'];
         const lines = [header.join(',')].concat((products || []).map(p => [
           '"' + String(p.name || '').replace(/"/g,'""') + '"',
+          '"' + String(p.producer || '').replace(/"/g,'""') + '"',
           p.min_required != null ? p.min_required : '',
           p.below_manual ? 'true' : 'false',
           (p.active === false) ? 'false' : 'true',
@@ -691,6 +764,37 @@
       if (_filterTimer) clearTimeout(_filterTimer);
       const val = el.productSearch.value;
       _filterTimer = setTimeout(() => filterProductOptions(val), 60);
+      if (el.btnClearSearch) {
+        el.btnClearSearch.style.display = val && val.length ? '' : 'none';
+      }
+    });
+    // Enter key: select first match or prime new product from query
+    el.productSearch.addEventListener('keydown', (ev) => {
+      if ((ev.key || ev.keyCode) === 'Enter' || ev.keyCode === 13) {
+        ev.preventDefault();
+        const val = el.productSearch.value;
+        filterProductOptions(val);
+        if (el.productSelect && el.productSelect.value) {
+          // Move focus to expiry for faster entry
+          if (el.expiry && typeof el.expiry.focus === 'function') el.expiry.focus();
+        } else if (el.newProductName) {
+          el.newProductName.value = (val || '').trim();
+          if (el.btnAddProduct && typeof el.btnAddProduct.focus === 'function') el.btnAddProduct.focus();
+        }
+      }
+    });
+    // Initialize clear button visibility
+    if (el.btnClearSearch) {
+      el.btnClearSearch.style.display = el.productSearch.value ? '' : 'none';
+    }
+  }
+
+  if (el.btnClearSearch && el.productSearch) {
+    el.btnClearSearch.addEventListener('click', () => {
+      el.productSearch.value = '';
+      if (el.btnClearSearch) el.btnClearSearch.style.display = 'none';
+      filterProductOptions('');
+      try { el.productSearch.focus(); } catch (_) {}
     });
   }
 

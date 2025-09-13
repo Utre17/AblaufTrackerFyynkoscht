@@ -41,6 +41,10 @@
       .auth input { width:auto; }
       .right { margin-left: auto; }
       .stack { display:flex; flex-direction: column; gap: 6px; }
+      .input-clear-wrap { position: relative; }
+      .input-clear-wrap input { padding-right: 36px; }
+      .input-clear-wrap button.clear { position:absolute; right:8px; top:50%; transform: translateY(-50%); border:none; background:transparent; font-size:18px; line-height:1; padding:2px 6px; cursor:pointer; color: var(--muted); }
+      .input-clear-wrap button.clear:focus { outline: 2px solid #d1d5db; border-radius: 6px; }
       /* Toast */
       .toast { position: fixed; left:50%; bottom:16px; transform: translateX(-50%) translateY(20px); background: var(--brand); color:#fff; padding:10px 14px; border-radius:999px; box-shadow: 0 6px 20px rgba(0,0,0,.2); opacity:0; pointer-events:none; transition: opacity .18s ease, transform .18s ease; z-index: 1000; }
       .toast.show { opacity:1; transform: translateX(-50%) translateY(0); }
@@ -83,7 +87,10 @@
         <label>Produkt</label>
         <div class="row">
           <div class="stack">
-            <input id="productSearch" type="text" placeholder="Suchen..." />
+            <div class="input-clear-wrap">
+              <input id="productSearch" type="text" placeholder="Suchen..." />
+              <button type="button" class="clear" id="btnClearSearch" title="Suche löschen" aria-label="Suche löschen" style="display:none;">×</button>
+            </div>
             <select id="productSelect"></select>
           </div>
           <div style="display:flex; gap:8px;">
@@ -135,7 +142,7 @@
             <div>
               <label>CSV-Datei mit Produkten</label>
               <input id="productCSV" type="file" accept=".csv,text/csv" />
-              <div class="small">Erwartete Spalten: name[, min_required, active, below_manual]</div>
+              <div class="small">Erwartete Spalten: name[, producer, min_required, active, below_manual]</div>
             </div>
             <div>
               <label>&nbsp;</label>
@@ -147,10 +154,19 @@
             </div>
           </div>
         </div>
+        <div class="actions" style="margin: 8px 0 12px; gap: 8px; align-items:center;">
+          <div style="min-width: 260px;">
+            <label>Produzent filtern</label>
+            <select id="producerFilter">
+              <option value="">Alle Produzenten</option>
+            </select>
+          </div>
+        </div>
         <table class="table">
           <thead>
             <tr>
               <th>Produkt</th>
+              <th>Produzent</th>
               <th style="width:160px;">Mindestbestand</th>
               <th style="width:220px;">Unter Mindestbestand?</th>
               <th style="width:120px;">Aktiv?</th>

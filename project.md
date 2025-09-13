@@ -143,6 +143,34 @@ node scripts/scrape_fyynkoscht.js --max 10 --out data/shop_products.csv
 ```
 Die erzeugte CSV kann anschließend im UI importiert werden.
 
+10) Produzenten (Brand)
+
+- Minimal (Textspalte): Produkte können einen Produzenten/Brand als Textfeld speichern.
+  - Schema: `ALTER TABLE public.products ADD COLUMN IF NOT EXISTS producer text;`
+  - UI-Import/Export: `producer` wird beim CSV-Import (Spalten: name, producer, …) mit upsert gespeichert und beim Export als Spalte ausgegeben.
+  - Befüllen: `node scripts/enrich_producers.js --in data/shop_products_expirable.csv --out data/shop_products_expirable_enriched.csv` erzeugt eine CSV mit `producer`-Spalte.
+    Diese CSV im Tab „Mindestbestand“ importieren (Upsert via Produktname).
+
+- Optional (normalisiert): Eigene Tabelle `producers` + `products.producer_id` (FK). Sinnvoll, wenn Filter/Statistiken pro Produzent benötigt werden.
+  - Beispiel-SQL:
+    ```sql
+    CREATE TABLE IF NOT EXISTS public.producers (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      name text UNIQUE NOT NULL,
+      website text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    ALTER TABLE public.products ADD COLUMN IF NOT EXISTS producer_id uuid REFERENCES public.producers(id) ON DELETE SET NULL;
+    ALTER TABLE public.producers ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS producers_select_all ON public.producers;
+    CREATE POLICY producers_select_all ON public.producers FOR SELECT TO anon, authenticated USING (true);
+    DROP POLICY IF EXISTS producers_write_auth ON public.producers;
+    CREATE POLICY producers_write_auth ON public.producers FOR INSERT TO authenticated WITH CHECK (true);
+    DROP POLICY IF EXISTS producers_update_auth ON public.producers;
+    CREATE POLICY producers_update_auth ON public.producers FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+    ```
+  - UI-Anpassungen wären nötig, um `producer_id` zu setzen/anzuzeigen.
+
 7) Deploy & iPad
 
 - Hosting: statisch (z. B. Netlify/Vercel). Dateien: index.html, app.js, config.js.
