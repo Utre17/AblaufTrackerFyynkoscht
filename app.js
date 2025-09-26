@@ -394,6 +394,19 @@
     return data;
   }
 
+  async function hasExistingActiveItem(product_id, expiry) {
+    await ensureClient();
+    const { data, error } = await supabase
+      .from('items')
+      .select('id')
+      .eq('product_id', product_id)
+      .eq('expiry', expiry)
+      .eq('status', 'Aktiv')
+      .limit(1);
+    if (error) throw error;
+    return Array.isArray(data) && data.length > 0;
+  }
+
   async function saveItem({ product_id, received_on, expiry, qty }) {
     await ensureClient();
     const payload = {
@@ -883,6 +896,13 @@
     if (!product_id) { alert('Bitte Produkt wählen.'); return; }
     if (!expiry) { alert('Bitte Ablaufdatum wählen.'); return; }
     try {
+      const exists = await hasExistingActiveItem(product_id, expiry);
+      if (exists) {
+        const msg = 'Eintrag existiert bereits für dieses Ablaufdatum.';
+        el.saveMsg.textContent = msg;
+        showToast(msg, 2200);
+        return;
+      }
       await saveItem({ product_id, received_on, expiry, qty });
       el.saveMsg.textContent = 'Gespeichert.';
       showToast('gespeichert');
