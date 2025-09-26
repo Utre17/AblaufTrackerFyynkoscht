@@ -132,6 +132,12 @@
       </section>
 
       <section id="view-all" class="view">
+        <div class="actions" style="margin: 0 0 12px; align-items: center;">
+          <div class="input-clear-wrap" style="flex:1; min-width: 240px;">
+            <input id="allSearch" type="text" placeholder="Aktive Einträge durchsuchen..." autocomplete="off" />
+            <button type="button" class="clear" id="btnClearAllSearch" title="Suche löschen" aria-label="Suche löschen" style="display:none;">&times;</button>
+          </div>
+        </div>
         <div class="list" id="listAll"></div>
       </section>
 
@@ -234,3 +240,4 @@
     <script src="app.js"></script>
   </body>
   </html>
+

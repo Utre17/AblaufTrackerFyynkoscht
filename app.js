@@ -5,6 +5,7 @@
     ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.ANON_KEY)
     : null;
   let productsCache = [];
+  let activeAllQuery = '';
 
   // UI elements
   const navButtons = document.querySelectorAll('nav button[data-view]');
@@ -29,6 +30,8 @@
     toast: document.getElementById('toast'),
     listSoon: document.getElementById('listSoon'),
     listAll: document.getElementById('listAll'),
+    allSearch: document.getElementById('allSearch'),
+    btnClearAllSearch: document.getElementById('btnClearAllSearch'),
     minTable: document.getElementById('minTable'),
     producerFilter: document.getElementById('producerFilter'),
     chips: document.querySelectorAll('.chip[data-add-days]'),
@@ -137,6 +140,9 @@
     Object.keys(views).forEach((k) => views[k].classList.remove('active'));
     views[name].classList.add('active');
     navButtons.forEach((b) => b.classList.toggle('active', b.dataset.view === name));
+    if (name === 'all' && el.allSearch) {
+      try { el.allSearch.focus(); } catch (_) {}
+    }
   }
 
   // Product name normalization and lookup (case/whitespace-insensitive)
@@ -511,9 +517,39 @@
       el.listSoon.innerHTML = soon.map(itemRowTemplateCompat).join('') || '<div class="small">Keine Einträge ≤14 Tage.</div>';
       el.listAll.innerHTML = all.map(itemRowTemplateCompat).join('') || '<div class="small">Keine aktiven Einträge.</div>';
       attachArchiveHandlers();
+      applyAllSearchFilter();
     } catch (e) {
       el.listSoon.innerHTML = `<div class="small">Fehler: ${e.message}</div>`;
       el.listAll.innerHTML = `<div class="small">Fehler: ${e.message}</div>`;
+    }
+  }
+
+  function applyAllSearchFilter() {
+    if (!el.listAll) return;
+    const items = Array.from(el.listAll.querySelectorAll('.item'));
+    if (items.length === 0) return;
+    const query = (activeAllQuery || '').trim().toLowerCase();
+    let visibleCount = 0;
+    items.forEach((item) => {
+      const textContent = (item.textContent || '').toLowerCase();
+      const show = !query || textContent.includes(query);
+      item.style.display = show ? '' : 'none';
+      if (show) visibleCount++;
+    });
+    let message = el.listAll.querySelector('.all-search-empty');
+    if (visibleCount === 0) {
+      if (!message) {
+        message = document.createElement('div');
+        message.className = 'small all-search-empty';
+        el.listAll.appendChild(message);
+      }
+      if (query) {
+        message.textContent = 'Keine Treffer für "' + activeAllQuery + '".';
+      } else {
+        message.textContent = 'Keine aktiven Einträge.';
+      }
+    } else if (message) {
+      message.remove();
     }
   }
 
@@ -795,6 +831,47 @@
       if (el.btnClearSearch) el.btnClearSearch.style.display = 'none';
       filterProductOptions('');
       try { el.productSearch.focus(); } catch (_) {}
+    });
+  }
+
+  if (el.allSearch) {
+    let _allSearchTimer = null;
+    const updateQuery = () => {
+      activeAllQuery = (el.allSearch.value || '').trim();
+      applyAllSearchFilter();
+      if (el.btnClearAllSearch) {
+        el.btnClearAllSearch.style.display = activeAllQuery ? '' : 'none';
+      }
+    };
+    el.allSearch.addEventListener('input', () => {
+      if (_allSearchTimer) clearTimeout(_allSearchTimer);
+      _allSearchTimer = setTimeout(updateQuery, 80);
+    });
+    el.allSearch.addEventListener('keydown', (ev) => {
+      const key = ev.key != null ? ev.key : ev.keyCode;
+      if (key === 'Enter' || key === 13) {
+        if (_allSearchTimer) clearTimeout(_allSearchTimer);
+        updateQuery();
+      } else if (key === 'Escape' || key === 27) {
+        if (el.allSearch.value) {
+          el.allSearch.value = '';
+          updateQuery();
+          try { el.allSearch.focus(); } catch (_) {}
+        }
+      }
+    });
+    if (el.btnClearAllSearch) {
+      el.btnClearAllSearch.style.display = el.allSearch.value ? '' : 'none';
+    }
+  }
+
+  if (el.btnClearAllSearch && el.allSearch) {
+    el.btnClearAllSearch.addEventListener('click', () => {
+      el.allSearch.value = '';
+      activeAllQuery = '';
+      applyAllSearchFilter();
+      el.btnClearAllSearch.style.display = 'none';
+      try { el.allSearch.focus(); } catch (_) {}
     });
   }
 
