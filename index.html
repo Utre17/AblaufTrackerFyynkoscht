@@ -161,7 +161,14 @@
           </div>
         </div>
         <div class="actions" style="margin: 8px 0 12px; gap: 8px; align-items:center;">
-          <div style="min-width: 260px;">
+          <div style="flex:1; min-width: 240px;">
+            <label>Produkte durchsuchen</label>
+            <div class="input-clear-wrap">
+              <input id="minSearch" type="text" placeholder="Name oder Produzent..." autocomplete="off" />
+              <button type="button" class="clear" id="btnClearMinSearch" title="Suche löschen" aria-label="Suche löschen" style="display:none;">&times;</button>
+            </div>
+          </div>
+          <div style="min-width: 240px;">
             <label>Produzent filtern</label>
             <select id="producerFilter">
               <option value="">Alle Produzenten</option>
@@ -240,4 +247,5 @@
     <script src="app.js"></script>
   </body>
   </html>
+
 

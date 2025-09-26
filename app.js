@@ -6,6 +6,7 @@
     : null;
   let productsCache = [];
   let activeAllQuery = '';
+  let minSearchQuery = '';
 
   // UI elements
   const navButtons = document.querySelectorAll('nav button[data-view]');
@@ -47,6 +48,8 @@
     btnExportCSV: document.getElementById('btnExportCSV'),
     importMsg: document.getElementById('importMsg'),
     btnClearSearch: document.getElementById('btnClearSearch'),
+    minSearch: document.getElementById('minSearch'),
+    btnClearMinSearch: document.getElementById('btnClearMinSearch'),
   };
 
   // Helpers
@@ -61,6 +64,13 @@
       _toastTimer = setTimeout(() => { el.toast.classList.remove('show'); }, ms);
     } catch (_) {}
   }
+
+  const escapeHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
   function filterProductOptions(query) {
     const q = normalizeName(query || '');
@@ -487,6 +497,14 @@
     return rows;
   }
 
+  function updateProductCacheEntry(id, patch) {
+    if (!Array.isArray(productsCache)) return;
+    const idx = productsCache.findIndex((p) => String(p.id) === String(id));
+    if (idx >= 0) {
+      productsCache[idx] = Object.assign({}, productsCache[idx], patch);
+    }
+  }
+
   async function updateProductMeta(id, patch) {
     await ensureClient();
     const { error } = await supabase.from('products').update(patch).eq('id', id);
@@ -582,24 +600,41 @@
   }
 
   function renderMinTable(products) {
-    // Apply producer filter if present
-    let list = products || [];
+    let list = Array.isArray(products) ? products.slice() : [];
     if (el.producerFilter && el.producerFilter.value !== undefined) {
       const f = el.producerFilter.value;
       if (f) {
         const fn = normalizeName(f);
-        list = list.filter(p => normalizeName(p.producer || '') === fn);
+        list = list.filter((p) => normalizeName(p.producer || '') === fn);
       }
     }
 
-    el.minTable.innerHTML = list.map((p) => {
+    const search = (minSearchQuery || '').trim();
+    if (search) {
+      const tokens = normalizeName(search).split(' ').filter(Boolean);
+      if (tokens.length > 0) {
+        list = list.filter((p) => {
+          const haystack = [normalizeName(p.name || ''), normalizeName(p.producer || '')].join(' ');
+          return tokens.every((token) => haystack.includes(token));
+        });
+      }
+    }
+
+    const rows = list.map((p) => {
       const ok = !p.below_manual;
+      const nameValue = escapeHtml(p.name || '');
+      const producerValue = escapeHtml(p.producer || '');
+      const minValue = p.min_required != null ? p.min_required : 0;
       return `
         <tr>
-          <td>${p.name}</td>
-          <td>${p.producer ? p.producer : ''}</td>
           <td>
-            <input type="number" min="0" step="1" value="${p.min_required || 0}" data-min="${p.id}" />
+            <input type="text" value="${nameValue}" data-name="${p.id}" data-original-value="${nameValue}" placeholder="Produktname" style="width:100%;" />
+          </td>
+          <td>
+            <input type="text" value="${producerValue}" data-producer="${p.id}" data-original-value="${producerValue}" placeholder="Produzent" style="width:100%;" />
+          </td>
+          <td>
+            <input type="number" min="0" step="1" value="${minValue}" data-min="${p.id}" />
           </td>
           <td>
             <span class="status-dot" style="background:${ok ? 'var(--green)' : 'var(--red)'}"></span>
@@ -616,27 +651,98 @@
           </td>
         </tr>
       `;
-    }).join('');
+    });
+
+    if (rows.length > 0) {
+      el.minTable.innerHTML = rows.join('');
+    } else {
+      el.minTable.innerHTML = '<tr><td colspan="5" class="small">Keine Ergebnisse.</td></tr>';
+    }
+
+    const bindTextInput = (selector, field) => {
+      const attribute = selector === 'input[data-name]' ? 'data-name' : 'data-producer';
+      el.minTable.querySelectorAll(selector).forEach((input) => {
+        const id = input.getAttribute(attribute);
+        const getOriginal = () => input.getAttribute('data-original-value') || '';
+        const commit = async () => {
+          const original = getOriginal();
+          const next = input.value.trim();
+          if (field === 'name' && !next) {
+            alert('Produktname darf nicht leer sein.');
+            input.value = original;
+            return;
+          }
+          if (next === original) return;
+          try {
+            const patch = {};
+            patch[field] = next || null;
+            await updateProductMeta(id, patch);
+            updateProductCacheEntry(id, patch);
+            input.setAttribute('data-original-value', next);
+            if (field === 'producer') {
+              renderProducerFilter(productsCache);
+            }
+            renderMinTable(productsCache);
+          } catch (e) {
+            alert('Speichern fehlgeschlagen: ' + e.message);
+            input.value = original;
+          }
+        };
+        input.addEventListener('blur', commit);
+        input.addEventListener('keydown', (ev) => {
+          const key = ev.key != null ? ev.key : ev.keyCode;
+          if (key === 'Enter' || key === 13) {
+            ev.preventDefault();
+            input.blur();
+          } else if (key === 'Escape' || key === 27) {
+            ev.preventDefault();
+            input.value = getOriginal();
+            input.blur();
+          }
+        });
+      });
+    };
+
+    bindTextInput('input[data-name]', 'name');
+    bindTextInput('input[data-producer]', 'producer');
 
     el.minTable.querySelectorAll('input[data-min]').forEach((input) => {
       input.addEventListener('change', async () => {
         const id = input.getAttribute('data-min');
         const val = Number(input.value || 0);
-        try { await updateProductMeta(id, { min_required: val }); } catch (e) { alert('Speichern fehlgeschlagen: ' + e.message); }
+        try {
+          await updateProductMeta(id, { min_required: val });
+          updateProductCacheEntry(id, { min_required: val });
+        } catch (e) {
+          alert('Speichern fehlgeschlagen: ' + e.message);
+        }
       });
     });
     el.minTable.querySelectorAll('input[data-below]').forEach((input) => {
       input.addEventListener('change', async () => {
         const id = input.getAttribute('data-below');
         const val = !!input.checked;
-        try { await updateProductMeta(id, { below_manual: val }); await loadMin(); } catch (e) { alert('Speichern fehlgeschlagen: ' + e.message); }
+        try {
+          await updateProductMeta(id, { below_manual: val });
+          updateProductCacheEntry(id, { below_manual: val });
+          renderMinTable(productsCache);
+        } catch (e) {
+          alert('Speichern fehlgeschlagen: ' + e.message);
+        }
       });
     });
     el.minTable.querySelectorAll('input[data-active]').forEach((input) => {
       input.addEventListener('change', async () => {
         const id = input.getAttribute('data-active');
         const val = !!input.checked;
-        try { await updateProductMeta(id, { active: val }); await loadProducts(); } catch (e) { alert('Speichern fehlgeschlagen: ' + e.message); }
+        try {
+          await updateProductMeta(id, { active: val });
+          updateProductCacheEntry(id, { active: val });
+          renderMinTable(productsCache);
+          await loadProducts();
+        } catch (e) {
+          alert('Speichern fehlgeschlagen: ' + e.message);
+        }
       });
     });
   }
@@ -684,6 +790,12 @@
     const products = await fetchProducts();
     renderProducerFilter(products);
     renderMinTable(products);
+    if (el.minSearch) {
+      el.minSearch.value = minSearchQuery || '';
+      if (el.btnClearMinSearch) {
+        el.btnClearMinSearch.style.display = minSearchQuery ? '' : 'none';
+      }
+    }
   }
 
   async function loadAll() {
@@ -885,6 +997,47 @@
       applyAllSearchFilter();
       el.btnClearAllSearch.style.display = 'none';
       try { el.allSearch.focus(); } catch (_) {}
+    });
+  }
+
+  if (el.minSearch) {
+    let _minSearchTimer = null;
+    const applyMinSearch = () => {
+      minSearchQuery = (el.minSearch.value || '').trim();
+      renderMinTable(productsCache);
+      if (el.btnClearMinSearch) {
+        el.btnClearMinSearch.style.display = minSearchQuery ? '' : 'none';
+      }
+    };
+    el.minSearch.addEventListener('input', () => {
+      if (_minSearchTimer) clearTimeout(_minSearchTimer);
+      _minSearchTimer = setTimeout(applyMinSearch, 80);
+    });
+    el.minSearch.addEventListener('keydown', (ev) => {
+      const key = ev.key != null ? ev.key : ev.keyCode;
+      if (key === 'Enter' || key === 13) {
+        if (_minSearchTimer) clearTimeout(_minSearchTimer);
+        applyMinSearch();
+      } else if (key === 'Escape' || key === 27) {
+        if (el.minSearch.value) {
+          el.minSearch.value = '';
+          applyMinSearch();
+          try { el.minSearch.focus(); } catch (_) {}
+        }
+      }
+    });
+    if (el.btnClearMinSearch) {
+      el.btnClearMinSearch.style.display = el.minSearch.value ? '' : 'none';
+    }
+  }
+
+  if (el.btnClearMinSearch && el.minSearch) {
+    el.btnClearMinSearch.addEventListener('click', () => {
+      el.minSearch.value = '';
+      minSearchQuery = '';
+      renderMinTable(productsCache);
+      el.btnClearMinSearch.style.display = 'none';
+      try { el.minSearch.focus(); } catch (_) {}
     });
   }
 
