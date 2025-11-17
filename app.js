@@ -297,6 +297,12 @@
     return s === '1' || s === 'true' || s === 'yes' || s === 'ja' || s === 'y' || s === 'wahr';
   }
 
+  function normalizeMinRequired(val) {
+    const num = Number(val);
+    if (val === undefined || val === null || val === '' || Number.isNaN(num) || num <= 0) return 5;
+    return num;
+  }
+
   async function upsertProducts(rows) {
     await ensureClient();
     // map to expected fields
@@ -389,7 +395,7 @@
       .select('*')
       .order('name', { ascending: true });
     if (error) throw error;
-    productsCache = data || [];
+    productsCache = (data || []).map((p) => Object.assign({}, p, { min_required: normalizeMinRequired(p.min_required) }));
     return productsCache;
   }
 
@@ -397,7 +403,7 @@
     await ensureClient();
     const { data, error } = await supabase
       .from('products')
-      .insert({ name, min_required: 5 })
+      .insert({ name, min_required: normalizeMinRequired() })
       .select()
       .single();
     if (error) throw error;
@@ -499,6 +505,9 @@
 
   function updateProductCacheEntry(id, patch) {
     if (!Array.isArray(productsCache)) return;
+    if (Object.prototype.hasOwnProperty.call(patch, 'min_required')) {
+      patch = Object.assign({}, patch, { min_required: normalizeMinRequired(patch.min_required) });
+    }
     const idx = productsCache.findIndex((p) => String(p.id) === String(id));
     if (idx >= 0) {
       productsCache[idx] = Object.assign({}, productsCache[idx], patch);
@@ -624,7 +633,7 @@
       const ok = !p.below_manual;
       const nameValue = escapeHtml(p.name || '');
       const producerValue = escapeHtml(p.producer || '');
-      const minValue = p.min_required != null ? p.min_required : 5;
+      const minValue = normalizeMinRequired(p.min_required);
       return `
         <tr class="min-row">
           <td>
@@ -896,7 +905,7 @@
         const lines = [header.join(',')].concat((products || []).map(p => [
           '"' + String(p.name || '').replace(/"/g,'""') + '"',
           '"' + String(p.producer || '').replace(/"/g,'""') + '"',
-          p.min_required != null ? p.min_required : '',
+          normalizeMinRequired(p.min_required),
           p.below_manual ? 'true' : 'false',
           (p.active === false) ? 'false' : 'true',
         ].join(',')));
