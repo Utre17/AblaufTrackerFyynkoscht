@@ -304,8 +304,8 @@
       .map(r => {
         const base = {
           name: (r.name || r.product || '').trim().replace(/\s+/g, ' '),
-          // Default min_required to 0 when missing to satisfy NOT NULL
-          min_required: r.min_required != null && r.min_required !== '' ? Number(r.min_required) : 0,
+          // Default min_required to 5 when missing to satisfy NOT NULL
+          min_required: r.min_required != null && r.min_required !== '' ? Number(r.min_required) : 5,
           // Default flags to sane values if missing to avoid NULL upserts
           below_manual: r.below_manual != null && r.below_manual !== '' ? toBool(r.below_manual) : false,
           active: r.active != null && r.active !== '' ? toBool(r.active) : true,
@@ -397,7 +397,7 @@
     await ensureClient();
     const { data, error } = await supabase
       .from('products')
-      .insert({ name })
+      .insert({ name, min_required: 5 })
       .select()
       .single();
     if (error) throw error;
@@ -624,7 +624,7 @@
       const ok = !p.below_manual;
       const nameValue = escapeHtml(p.name || '');
       const producerValue = escapeHtml(p.producer || '');
-      const minValue = p.min_required != null ? p.min_required : 0;
+      const minValue = p.min_required != null ? p.min_required : 5;
       return `
         <tr class="min-row">
           <td>
