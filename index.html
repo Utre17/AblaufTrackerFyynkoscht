@@ -34,7 +34,19 @@
       .badge.orange { background:#ffedd5; color:#9a3412; border-color:#fed7aa; }
       .badge.green { background:#dcfce7; color:#065f46; border-color:#bbf7d0; }
       .table { width: 100%; border-collapse: collapse; background:#fff; border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; }
+      .table-scroll { width:100%; overflow-x:auto; }
+      .table.min-table { min-width: 750px; }
       .table th, .table td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+      #minTable input[data-name] { min-width: 160px; }
+      #minTable input[data-name]:focus { min-width: 240px; }
+      #minTable input[data-producer] { min-width: 120px; }
+      #minTable input[data-producer].editing { min-width: 160px; }
+      #minTable input[data-min] { max-width: 60px; }
+      .input-edit-wrap { display:flex; align-items:center; gap:6px; }
+      .input-edit-wrap input { flex:1; }
+      .edit-btn { width:34px; height:34px; padding:6px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #d1d5db; background:#f3f4f6; color:#374151; border-radius:8px; cursor:pointer; }
+      .edit-btn svg { width:16px; height:16px; fill: currentColor; pointer-events:none; }
+      .edit-btn:focus { outline:2px solid #d1d5db; outline-offset:1px; }
       .status-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right: 6px; vertical-align: middle; }
       .note { background:#fff; border:1px dashed #d1d5db; border-radius: 10px; padding: 10px 12px; color: var(--muted); }
       .auth { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
@@ -142,24 +154,6 @@
       </section>
 
       <section id="view-min" class="view">
-        <div class="note" style="margin-bottom:12px;">
-          <div style="font-weight:600; margin-bottom:6px;">Produkte verwalten</div>
-          <div class="row">
-            <div>
-              <label>CSV-Datei mit Produkten</label>
-              <input id="productCSV" type="file" accept=".csv,text/csv" />
-              <div class="small">Erwartete Spalten: name[, producer, min_required, active, below_manual]</div>
-            </div>
-            <div>
-              <label>&nbsp;</label>
-              <div class="actions">
-                <button class="btn" id="btnImportCSV">CSV importieren (Produkte)</button>
-                <button class="btn" id="btnExportCSV">CSV exportieren (Produkte)</button>
-              </div>
-              <div id="importMsg" class="small" style="margin-top:6px;"></div>
-            </div>
-          </div>
-        </div>
         <div class="actions" style="margin: 8px 0 12px; gap: 8px; align-items:center;">
           <div style="flex:1; min-width: 240px;">
             <label>Produkte durchsuchen</label>
@@ -175,18 +169,20 @@
             </select>
           </div>
         </div>
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Produkt</th>
-              <th>Produzent</th>
-              <th style="width:160px;">Mindestbestand</th>
-              <th style="width:220px;">Unter Mindestbestand?</th>
-              <th style="width:120px;">Aktiv?</th>
-            </tr>
-          </thead>
-          <tbody id="minTable"></tbody>
-        </table>
+        <div class="table-scroll">
+          <table class="table min-table">
+            <thead>
+              <tr>
+                <th>Produkt</th>
+                <th>Produzent</th>
+                <th style="width:160px;">Mindestbestand</th>
+                <th style="width:220px;">Unter Mindestbestand?</th>
+                <th style="width:120px;">Aktiv?</th>
+              </tr>
+            </thead>
+            <tbody id="minTable"></tbody>
+          </table>
+        </div>
         <div class="small" style="margin-top:8px;">Diese Liste ist rein manuell und nicht mit Lieferungen verknÃ¼pft.</div>
       </section>
     </main>

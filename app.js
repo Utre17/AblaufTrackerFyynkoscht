@@ -626,12 +626,22 @@
       const producerValue = escapeHtml(p.producer || '');
       const minValue = p.min_required != null ? p.min_required : 0;
       return `
-        <tr>
+        <tr class="min-row">
           <td>
-            <input type="text" value="${nameValue}" data-name="${p.id}" data-original-value="${nameValue}" placeholder="Produktname" style="width:100%;" />
+            <div class="input-edit-wrap">
+              <input type="text" value="${nameValue}" data-name="${p.id}" data-original-value="${nameValue}" placeholder="Produktname" style="width:100%;" readonly />
+              <button type="button" class="edit-btn" data-edit-name="${p.id}" aria-label="Produkt bearbeiten">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.7 2.3a1 1 0 0 1 1.4 0l2.6 2.6a1 1 0 0 1 0 1.4l-9.2 9.2a1 1 0 0 1-.46.26l-4.2 1a1 1 0 0 1-1.21-1.21l1-4.2a1 1 0 0 1 .26-.46l9.2-9.19Zm-9.9 9.19-.56 2.35 2.35-.55 8.84-8.84-1.8-1.8-8.83 8.84Zm11.4-10.2-1.08 1.07 1.8 1.8 1.07-1.07-1.8-1.8Z"></path></svg>
+              </button>
+            </div>
           </td>
           <td>
-            <input type="text" value="${producerValue}" data-producer="${p.id}" data-original-value="${producerValue}" placeholder="Produzent" style="width:100%;" />
+            <div class="input-edit-wrap">
+              <input type="text" value="${producerValue}" data-producer="${p.id}" data-original-value="${producerValue}" placeholder="Produzent" style="width:100%;" readonly />
+              <button type="button" class="edit-btn" data-edit-producer="${p.id}" aria-label="Produzent bearbeiten">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.7 2.3a1 1 0 0 1 1.4 0l2.6 2.6a1 1 0 0 1 0 1.4l-9.2 9.2a1 1 0 0 1-.46.26l-4.2 1a1 1 0 0 1-1.21-1.21l1-4.2a1 1 0 0 1 .26-.46l9.2-9.19Zm-9.9 9.19-.56 2.35 2.35-.55 8.84-8.84-1.8-1.8-8.83 8.84Zm11.4-10.2-1.08 1.07 1.8 1.8 1.07-1.07-1.8-1.8Z"></path></svg>
+              </button>
+            </div>
           </td>
           <td>
             <input type="number" min="0" step="1" value="${minValue}" data-min="${p.id}" />
@@ -659,6 +669,33 @@
       el.minTable.innerHTML = '<tr><td colspan="5" class="small">Keine Ergebnisse.</td></tr>';
     }
 
+    const lockRow = (input) => {
+      const row = input.closest('tr');
+      if (!row) return;
+      row.querySelectorAll('input[data-name], input[data-producer]').forEach((inp) => {
+        inp.readOnly = true;
+        inp.classList.remove('editing');
+      });
+    };
+
+    const enableEditing = (btnSelector, inputSelector) => {
+      el.minTable.querySelectorAll(btnSelector).forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const row = btn.closest('tr');
+          if (!row) return;
+          const input = row.querySelector(inputSelector);
+          if (!input) return;
+          input.readOnly = false;
+          input.classList.add('editing');
+          input.focus();
+          input.select();
+        });
+      });
+    };
+
+    enableEditing('button[data-edit-name]', 'input[data-name]');
+    enableEditing('button[data-edit-producer]', 'input[data-producer]');
+
     const bindTextInput = (selector, field) => {
       const attribute = selector === 'input[data-name]' ? 'data-name' : 'data-producer';
       el.minTable.querySelectorAll(selector).forEach((input) => {
@@ -670,9 +707,13 @@
           if (field === 'name' && !next) {
             alert('Produktname darf nicht leer sein.');
             input.value = original;
+            input.focus();
             return;
           }
-          if (next === original) return;
+          if (next === original) {
+            lockRow(input);
+            return;
+          }
           try {
             const patch = {};
             patch[field] = next || null;
@@ -686,7 +727,10 @@
           } catch (e) {
             alert('Speichern fehlgeschlagen: ' + e.message);
             input.value = original;
+            lockRow(input);
+            return;
           }
+          lockRow(input);
         };
         input.addEventListener('blur', commit);
         input.addEventListener('keydown', (ev) => {
