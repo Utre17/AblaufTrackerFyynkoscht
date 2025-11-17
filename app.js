@@ -50,6 +50,7 @@
     btnClearSearch: document.getElementById('btnClearSearch'),
     minSearch: document.getElementById('minSearch'),
     btnClearMinSearch: document.getElementById('btnClearMinSearch'),
+    btnSendBelowList: document.getElementById('btnSendBelowList'),
   };
 
   // Helpers
@@ -514,6 +515,18 @@
     }
   }
 
+  function getBelowMinList() {
+    if (!Array.isArray(productsCache)) return [];
+    return productsCache
+      .filter((p) => p.below_manual)
+      .map((p) => ({
+        name: p.name || '',
+        producer: p.producer || '',
+        min_required: normalizeMinRequired(p.min_required),
+      }))
+      .sort((a, b) => normalizeName(a.name).localeCompare(normalizeName(b.name)));
+  }
+
   async function updateProductMeta(id, patch) {
     await ensureClient();
     const { error } = await supabase.from('products').update(patch).eq('id', id);
@@ -855,6 +868,54 @@
     await Promise.all([loadProducts(), renderLists(), loadMin()]);
   }
 
+  function buildBelowMinEmailBody(items) {
+    if (!items || items.length === 0) return '';
+    const lines = items.map((p) => {
+      const prod = p.producer ? ` (${p.producer})` : '';
+      return `- ${p.name}${prod} — Mindestbestand: ${p.min_required}`;
+    });
+    return ['Produkte unter Mindestbestand:', '', ...lines].join('\n');
+  }
+
+  function buildBelowMinPreviewHtml(items) {
+    const now = new Date();
+    const stamp = now.toLocaleString('de-CH');
+    const rows = items.map((p) => {
+      const prod = p.producer ? ` (${escapeHtml(p.producer)})` : '';
+      return `<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(String(p.min_required))}</td><td>${prod || ''}</td></tr>`;
+    }).join('');
+    return `
+      <!DOCTYPE html>
+      <html lang="de">
+        <head>
+          <meta charset="utf-8" />
+          <title>Produkte unter Mindestbestand</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; color: #0b1221; }
+            h1 { margin: 0 0 8px; }
+            .small { color: #555; margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { padding: 8px 10px; border: 1px solid #e5e7eb; text-align: left; }
+            th { background: #f3f4f6; }
+            .actions { margin: 12px 0; }
+            button { padding: 8px 12px; border: 1px solid #d1d5db; background: #fff; border-radius: 8px; cursor: pointer; }
+          </style>
+        </head>
+        <body>
+          <h1>Produkte unter Mindestbestand</h1>
+          <div class="small">Erstellt am ${stamp}. Gesamt: ${items.length}</div>
+          <table>
+            <thead><tr><th>Produkt</th><th>Mindestbestand</th><th>Produzent</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="actions">
+            <button onclick="window.print()">Drucken / als PDF speichern</button>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
   // Events
   navButtons.forEach((b) => b.addEventListener('click', () => setActiveView(b.dataset.view)));
 
@@ -893,6 +954,25 @@
       } catch (e) {
         el.importMsg.textContent = 'Import fehlgeschlagen: ' + (e.message || e);
       }
+    });
+  }
+
+  if (el.btnSendBelowList) {
+    el.btnSendBelowList.addEventListener('click', () => {
+      const items = getBelowMinList();
+      if (!items || items.length === 0) {
+        alert('Keine Produkte unter Mindestbestand markiert.');
+        return;
+      }
+      const html = buildBelowMinPreviewHtml(items);
+      const win = window.open('', '_blank');
+      if (!win) {
+        alert('Popup wurde blockiert. Bitte Popups erlauben oder die Liste manuell kopieren.');
+        return;
+      }
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
     });
   }
 
